@@ -3,7 +3,6 @@ import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import AuthorModal from '@/src/components/AuthorModal';
-// 💡 Supabaseをインポート（環境に合わせてパスを調整してください）
 import { supabase } from '@/lib/supabase';
 
 interface ProjectDetail {
@@ -27,7 +26,7 @@ const linkify = (text: string) => {
           href={part} 
           target="_blank" 
           rel="noopener noreferrer" 
-          className="text-blue-600 hover:text-blue-800 hover:underline transition-colors break-all"
+          className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:underline transition-colors break-all"
         >
           {part}
         </a>
@@ -50,12 +49,19 @@ export default function ProjectPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDescExpanded, setIsDescExpanded] = useState(false);
 
-  // 💡 ブックマーク用のステートを追加
   const [isBookmarked, setIsBookmarked] = useState(false);
   const [user, setUser] = useState<any>(null);
   const [bookmarkLoading, setBookmarkLoading] = useState(false);
 
-  // 💡 ブックマーク状態の確認
+  const [playerType, setPlayerType] = useState<'turbowarp' | 'scratch'>('turbowarp');
+
+  useEffect(() => {
+    const savedPlayer = localStorage.getItem('player_type');
+    if (savedPlayer === 'scratch') {
+      setPlayerType('scratch');
+    }
+  }, []);
+
   useEffect(() => {
     const checkBookmark = async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -75,7 +81,6 @@ export default function ProjectPage() {
     if (projectId) checkBookmark();
   }, [projectId]);
 
-  // プロジェクトデータの取得
   useEffect(() => {
     if (!projectId) return;
 
@@ -127,7 +132,6 @@ export default function ProjectPage() {
     }
   };
 
-  // 💡 ブックマーク切り替え処理
   const toggleBookmark = async () => {
     if (!user) {
       alert('ブックマーク機能を使うにはログインしてください。');
@@ -135,50 +139,41 @@ export default function ProjectPage() {
     }
     setBookmarkLoading(true);
 
-    // 最新の配列を取得
-    const { data } = await supabase
-      .from('profiles')
-      .select('bookmarked_projects')
-      .eq('id', user.id)
-      .single();
-      
+    const { data } = await supabase.from('profiles').select('bookmarked_projects').eq('id', user.id).single();
     let currentBookmarks = data?.bookmarked_projects || [];
     
-    // 追加か削除かを判定
     let newBookmarks = isBookmarked 
       ? currentBookmarks.filter((id: string) => id !== projectId)
       : [...currentBookmarks, projectId];
     
-    // Supabaseを更新
-    const { error } = await supabase
-      .from('profiles')
-      .update({ bookmarked_projects: newBookmarks })
-      .eq('id', user.id);
+    const { error } = await supabase.from('profiles').update({ bookmarked_projects: newBookmarks }).eq('id', user.id);
       
-    if (!error) {
-      setIsBookmarked(!isBookmarked);
-    } else {
-      alert('更新に失敗しました。');
-    }
+    if (!error) setIsBookmarked(!isBookmarked);
+    else alert('更新に失敗しました。');
+    
     setBookmarkLoading(false);
   };
 
   if (loading) {
-    return <div className="text-center mt-20 text-gray-500 font-medium">プロジェクトを読み込んでいます...</div>;
+    return <div className="text-center mt-20 text-gray-500 dark:text-gray-400 font-medium">プロジェクトを読み込んでいます...</div>;
   }
 
   if (errorMsg || !project) {
     return (
       <div className="flex flex-col items-center justify-center mt-32 px-4">
         <span className="text-4xl mb-4">😿</span>
-        <h2 className="text-xl font-bold text-gray-800 mb-2">読み込みエラー</h2>
-        <p className="text-gray-600 text-center">{errorMsg || 'プロジェクトが見つかりません。'}</p>
-        <button onClick={() => window.history.back()} className="mt-6 px-6 py-2 bg-gray-900 text-white rounded-full text-sm font-medium hover:bg-gray-800 transition-colors">
+        <h2 className="text-xl font-bold text-gray-800 dark:text-gray-200 mb-2">読み込みエラー</h2>
+        <p className="text-gray-600 dark:text-gray-400 text-center">{errorMsg || 'プロジェクトが見つかりません。'}</p>
+        <button onClick={() => window.history.back()} className="mt-6 px-6 py-2 bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 rounded-full text-sm font-medium hover:bg-gray-800 transition-colors">
           前のページに戻る
         </button>
       </div>
     );
   }
+
+  const iframeSrc = playerType === 'scratch' 
+    ? `https://scratch.mit.edu/projects/${projectId}/embed`
+    : `https://turbowarp.org/${projectId}/embed?addons=pause`;
 
   return (
     <div className="max-w-[1600px] mx-auto px-4 md:px-6 py-4">
@@ -186,9 +181,9 @@ export default function ProjectPage() {
         
         <div className="w-full lg:w-[65%] xl:w-[70%]">
           
-          <div className="w-full aspect-[4/3] bg-gray-100 dark:bg-black rounded-xl overflow-hidden mb-4 shadow-md">
+          <div className="w-full aspect-[4/3] bg-gray-100 dark:bg-gray-800 rounded-xl overflow-hidden mb-4 shadow-md">
             <iframe 
-              src={`https://turbowarp.org/${projectId}/embed?addons=pause`} 
+              src={iframeSrc} 
               width="100%" 
               height="100%" 
               className="border-none"
@@ -196,33 +191,32 @@ export default function ProjectPage() {
             ></iframe>
           </div>
 
-          <h1 className="text-2xl font-bold text-gray-900 mb-3">{project.title}</h1>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-3">{project.title}</h1>
 
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-gray-200">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-gray-200 dark:border-gray-800">
             <div className="flex items-center gap-4">
               <div 
-                className="flex items-center gap-3 cursor-pointer p-2 -ml-2 rounded-xl hover:bg-gray-100 transition-colors"
+                className="flex items-center gap-3 cursor-pointer p-2 -ml-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
                 onClick={() => setIsModalOpen(true)}
               >
                 <img 
                   src={`https://cdn2.scratch.mit.edu/get_image/user/${project.author.id}_60x60.png`} 
                   alt={project.author.username} 
-                  className="w-12 h-12 rounded-full bg-gray-200"
+                  className="w-12 h-12 rounded-full bg-gray-200 dark:bg-gray-700"
                 />
                 <div>
-                  <p className="font-bold text-gray-900 text-sm sm:text-base">{project.author.username}</p>
-                  <p className="text-xs text-gray-500">クリックして詳細を表示</p>
+                  <p className="font-bold text-gray-900 dark:text-white text-sm sm:text-base">{project.author.username}</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">クリックして詳細を表示</p>
                 </div>
               </div>
               
-              {/* 💡 PC版: ブックマーク保存ボタン */}
               <button
                 onClick={toggleBookmark}
                 disabled={bookmarkLoading}
                 className={`hidden sm:flex items-center gap-1.5 px-4 py-2 font-bold text-sm rounded-full transition-colors ${
                   isBookmarked 
-                    ? 'bg-yellow-50 text-yellow-700 hover:bg-yellow-100' 
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    ? 'bg-yellow-50 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 hover:bg-yellow-100 dark:hover:bg-yellow-900/50' 
+                    : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
                 }`}
               >
                 {isBookmarked ? '⭐ 保存済み' : '☆ 保存'}
@@ -232,31 +226,30 @@ export default function ProjectPage() {
                 href={`https://scratch.mit.edu/projects/${projectId}/`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="hidden sm:flex items-center gap-1.5 px-4 py-2 bg-blue-50 text-blue-600 hover:bg-blue-100 font-bold text-sm rounded-full transition-colors"
+                className="hidden sm:flex items-center gap-1.5 px-4 py-2 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/50 font-bold text-sm rounded-full transition-colors"
               >
                 Scratchで見る ↗
               </a>
             </div>
 
-            <div className="flex items-center gap-2 bg-gray-100 rounded-full px-4 py-2 self-start sm:self-auto overflow-x-auto whitespace-nowrap">
+            <div className="flex items-center gap-2 bg-gray-100 dark:bg-gray-800 rounded-full px-4 py-2 self-start sm:self-auto overflow-x-auto whitespace-nowrap text-gray-800 dark:text-gray-200">
               <span className="text-sm font-medium flex items-center gap-1.5"><span className="text-lg">👀</span> {project.stats.views.toLocaleString()}</span>
-              <div className="w-[1px] h-4 bg-gray-300 mx-1"></div>
+              <div className="w-[1px] h-4 bg-gray-300 dark:bg-gray-600 mx-1"></div>
               <span className="text-sm font-medium flex items-center gap-1.5"><span className="text-lg">❤️</span> {project.stats.loves.toLocaleString()}</span>
-              <div className="w-[1px] h-4 bg-gray-300 mx-1"></div>
+              <div className="w-[1px] h-4 bg-gray-300 dark:bg-gray-600 mx-1"></div>
               <span className="text-sm font-medium flex items-center gap-1.5"><span className="text-lg">⭐</span> {project.stats.favorites.toLocaleString()}</span>
-              <div className="w-[1px] h-4 bg-gray-300 mx-1"></div>
+              <div className="w-[1px] h-4 bg-gray-300 dark:bg-gray-600 mx-1"></div>
               <span className="text-sm font-medium flex items-center gap-1.5"><span className="text-lg">🌀</span> {project.stats.remixes.toLocaleString()}</span>
             </div>
             
-            {/* 💡 モバイル版の各種ボタン */}
             <div className="sm:hidden flex gap-2">
               <button
                 onClick={toggleBookmark}
                 disabled={bookmarkLoading}
                 className={`px-4 py-2 font-bold text-sm rounded-full transition-colors flex-1 ${
                   isBookmarked 
-                    ? 'bg-yellow-50 text-yellow-700 hover:bg-yellow-100' 
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    ? 'bg-yellow-50 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 hover:bg-yellow-100 dark:hover:bg-yellow-900/50' 
+                    : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
                 }`}
               >
                 {isBookmarked ? '⭐ 保存済み' : '☆ 保存'}
@@ -265,7 +258,7 @@ export default function ProjectPage() {
                 href={`https://scratch.mit.edu/projects/${projectId}/`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex-1 text-center px-4 py-2 bg-blue-50 text-blue-600 hover:bg-blue-100 font-bold text-sm rounded-full transition-colors"
+                className="flex-1 text-center px-4 py-2 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/50 font-bold text-sm rounded-full transition-colors"
               >
                 Scratchで見る ↗
               </a>
@@ -273,7 +266,7 @@ export default function ProjectPage() {
           </div>
 
           <div 
-            className={`mt-4 bg-gray-100 hover:bg-gray-200 transition-colors rounded-2xl p-5 text-sm md:text-base text-gray-800 ${!isDescExpanded ? 'cursor-pointer' : ''}`}
+            className={`mt-4 bg-gray-50 dark:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors rounded-2xl p-5 text-sm md:text-base text-gray-800 dark:text-gray-200 ${!isDescExpanded ? 'cursor-pointer' : ''}`}
             onClick={() => {
               if (!isDescExpanded) setIsDescExpanded(true);
             }}
@@ -281,24 +274,24 @@ export default function ProjectPage() {
             <div className={!isDescExpanded ? 'line-clamp-3' : ''}>
               {project.instructions && (
                 <div className="mb-4">
-                  <h3 className="font-bold text-gray-900 mb-1">使い方</h3>
+                  <h3 className="font-bold text-gray-900 dark:text-white mb-1">使い方</h3>
                   <p className="whitespace-pre-wrap leading-relaxed break-words">{linkify(project.instructions)}</p>
                 </div>
               )}
               {project.description && (
                 <div>
-                  <h3 className="font-bold text-gray-900 mb-1">メモとクレジット</h3>
+                  <h3 className="font-bold text-gray-900 dark:text-white mb-1">メモとクレジット</h3>
                   <p className="whitespace-pre-wrap leading-relaxed break-words">{linkify(project.description)}</p>
                 </div>
               )}
               {!project.instructions && !project.description && (
-                <p className="text-gray-500">説明はありません。</p>
+                <p className="text-gray-500 dark:text-gray-400">説明はありません。</p>
               )}
             </div>
             
             {(project.instructions || project.description) && (
               <button 
-                className="mt-2 font-bold text-gray-900 hover:text-gray-600"
+                className="mt-2 font-bold text-gray-900 dark:text-white hover:text-gray-600 dark:hover:text-gray-300"
                 onClick={(e) => {
                   e.stopPropagation(); 
                   setIsDescExpanded(!isDescExpanded);
@@ -310,18 +303,17 @@ export default function ProjectPage() {
           </div>
         </div>
 
-        {/* 右側: 関連作品リスト */}
         <div className="w-full lg:w-[35%] xl:w-[30%] mt-8 lg:mt-0">
           <div className="flex gap-2 mb-4">
             <button 
               onClick={() => handleTabChange('author')}
-              className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors ${relatedTab === 'author' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+              className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors ${relatedTab === 'author' ? 'bg-gray-900 dark:bg-white text-white dark:text-gray-900' : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'}`}
             >
               同じ作者の作品
             </button>
             <button 
               onClick={() => handleTabChange('remix')}
-              className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors ${relatedTab === 'remix' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+              className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors ${relatedTab === 'remix' ? 'bg-gray-900 dark:bg-white text-white dark:text-gray-900' : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'}`}
             >
               リミックス
             </button>
@@ -329,13 +321,13 @@ export default function ProjectPage() {
 
           <div className="flex flex-col gap-3">
             {relatedProjects.length === 0 ? (
-              <p className="text-sm text-gray-500 mt-4 px-2">
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-4 px-2">
                 {relatedTab === 'author' ? '他の作品はありません。' : 'リミックスはありません。'}
               </p>
             ) : (
               relatedProjects.map((relProject) => (
-                <Link href={`/${relProject.id}`} key={relProject.id} className="flex gap-3 group hover:bg-gray-50 p-2 -mx-2 rounded-xl transition-colors">
-                  <div className="w-40 aspect-[4/3] flex-shrink-0 bg-gray-200 rounded-lg overflow-hidden relative">
+                <Link href={`/${relProject.id}`} key={relProject.id} className="flex gap-3 group hover:bg-gray-50 dark:hover:bg-gray-800/50 p-2 -mx-2 rounded-xl transition-colors">
+                  <div className="w-40 aspect-[4/3] flex-shrink-0 bg-gray-200 dark:bg-gray-700 rounded-lg overflow-hidden relative">
                     <img 
                       src={relProject.image || `https://cdn2.scratch.mit.edu/get_image/project/${relProject.id}_480x360.png`} 
                       alt={relProject.title}
@@ -343,9 +335,9 @@ export default function ProjectPage() {
                     />
                   </div>
                   <div className="flex flex-col py-1 overflow-hidden">
-                    <h4 className="font-bold text-sm text-gray-900 line-clamp-2 mb-1 leading-snug group-hover:text-blue-600">{relProject.title}</h4>
-                    <p className="text-xs text-gray-600">{relProject.author.username}</p>
-                    <p className="text-[11px] text-gray-500 mt-1 flex gap-2">
+                    <h4 className="font-bold text-sm text-gray-900 dark:text-white line-clamp-2 mb-1 leading-snug group-hover:text-blue-600 dark:group-hover:text-blue-400">{relProject.title}</h4>
+                    <p className="text-xs text-gray-600 dark:text-gray-400">{relProject.author.username}</p>
+                    <p className="text-[11px] text-gray-500 dark:text-gray-500 mt-1 flex gap-2">
                       <span>👀 {relProject.stats.views.toLocaleString()}</span>
                       <span>⭐ {relProject.stats.favorites.toLocaleString()}</span>
                     </p>
@@ -358,11 +350,14 @@ export default function ProjectPage() {
 
       </div>
 
-      <AuthorModal 
-        isOpen={isModalOpen} 
-        onClose={() => setIsModalOpen(false)} 
-        author={project.author} 
-      />
+      {/* 以前のパス @/src/components/AuthorModal に戻しました */}
+      {project && (
+        <AuthorModal 
+          isOpen={isModalOpen} 
+          onClose={() => setIsModalOpen(false)} 
+          author={project.author} 
+        />
+      )}
     </div>
   );
 }
