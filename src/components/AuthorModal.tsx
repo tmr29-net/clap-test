@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase'; // パスは環境に合わせてください
+import type { User } from '@supabase/supabase-js'; // ⭕️ これを追加！
 
 interface Author {
   id: number;
@@ -15,7 +16,7 @@ interface AuthorModalProps {
 
 export default function AuthorModal({ isOpen, onClose, author }: AuthorModalProps) {
   const [isBookmarked, setIsBookmarked] = useState(false);
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(false);
 
   // モーダルが開いた時にログイン状態とブックマーク状態をチェック
@@ -49,7 +50,7 @@ export default function AuthorModal({ isOpen, onClose, author }: AuthorModalProp
     setLoading(true);
 
     const { data } = await supabase.from('profiles').select('bookmarked_authors').eq('id', user.id).single();
-    let currentBookmarks = data?.bookmarked_authors || [];
+    const currentBookmarks = data?.bookmarked_authors || [];
     
     let newBookmarks;
     if (isBookmarked) {

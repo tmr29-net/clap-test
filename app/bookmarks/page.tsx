@@ -4,14 +4,29 @@ import Link from 'next/link';
 // ※パスは環境に合わせて `@/src/...` や `../../...` に適宜変更してください
 import { supabase } from '@/lib/supabase';
 import AuthorModal from '@/src/components/AuthorModal';
+import { type User } from '@supabase/supabase-js';
+
+// プロジェクトと作者用の型を簡易的に定義しておきます
+type Project = {
+  id?: string | number;
+  recentProjects?: Project[];
+  [key: string]: unknown; // その他どんなデータが来てもエラーにしないおまじない
+};
+
+type Author = {
+  id?: number;
+  username?: string;
+  [key: string]: unknown;
+};
 
 export default function BookmarksPage() {
   const [activeTab, setActiveTab] = useState<'projects' | 'authors'>('projects');
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<User | null>(null);
   
-  const [projects, setProjects] = useState<any[]>([]);
-  const [authors, setAuthors] = useState<any[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [authors, setAuthors] = useState<Author[]>([]);
   const [loading, setLoading] = useState(true);
+  
 
   // 💡 プロジェクト絞り込み検索用のステート
   const [searchQuery, setSearchQuery] = useState('');
@@ -156,6 +171,7 @@ export default function BookmarksPage() {
             {filteredProjects.map((project, idx) => (
               <Link href={`/${project.id}`} key={`${project.id}-${idx}`} className="flex flex-col group">
                 <div className="overflow-hidden rounded-xl mb-2 bg-gray-100 aspect-[4/3]">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img 
                     src={project.image || `https://cdn2.scratch.mit.edu/get_image/project/${project.id}_480x360.png`} 
                     alt={project.title} 
@@ -181,6 +197,7 @@ export default function BookmarksPage() {
                 
                 {/* 作者のヘッダー部分 */}
                 <div className="flex items-center gap-4 mb-4">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img 
                     src={`https://cdn2.scratch.mit.edu/get_image/user/${author.id}_60x60.png`} 
                     alt={author.username} 
@@ -207,9 +224,10 @@ export default function BookmarksPage() {
                 {/* その作者の最新プロジェクト4件 */}
                 {author.recentProjects && author.recentProjects.length > 0 ? (
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-                    {author.recentProjects.map((project: any) => (
+                    {author.recentProjects.map((project: Project) => (
                       <Link href={`/${project.id}`} key={project.id} className="flex flex-col group">
                         <div className="overflow-hidden rounded-xl mb-2 bg-gray-100 aspect-[4/3]">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img 
                             src={project.image || `https://cdn2.scratch.mit.edu/get_image/project/${project.id}_480x360.png`} 
                             alt={project.title} 

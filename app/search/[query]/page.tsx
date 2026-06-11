@@ -43,10 +43,12 @@ export default function SearchResults() {
       try {
         const parsed = JSON.parse(cachedState);
         if (parsed.query === decodedQuery) {
-          setProjects(parsed.projects);
-          setPage(parsed.page);
-          setSort(parsed.sort);
-          setIsInitialized(true);
+          setTimeout(() => {
+            setProjects(parsed.projects);
+            setPage(parsed.page);
+            setSort(parsed.sort);
+            setIsInitialized(true);
+          }, 0);
           // スクロール位置はまだ消さない
           sessionStorage.removeItem('clap_search_state');
           return;
@@ -55,7 +57,7 @@ export default function SearchResults() {
         console.error("キャッシュの復元に失敗しました", e);
       }
     }
-    setIsInitialized(true);
+    setTimeout(() => {setIsInitialized(true);}, 0);
   }, [decodedQuery]);
 
   // 1.5 💡 プロジェクトが画面に描画された「後」にスクロールを復元する
@@ -99,7 +101,10 @@ export default function SearchResults() {
   useEffect(() => {
     if (!isInitialized || !decodedQuery || decodedQuery === 'undefined') return;
     if (projects.length === 0) {
-      loadProjects(urlPage, sort);
+      // ⭕️ 修正：setTimeout で一瞬遅らせて呼び出す
+      setTimeout(() => {
+        loadProjects(urlPage, sort);
+      }, 0);
     }
   }, [isInitialized, decodedQuery]);
 

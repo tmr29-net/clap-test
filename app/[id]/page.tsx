@@ -1,9 +1,10 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback} from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import AuthorModal from '@/src/components/AuthorModal';
 import { supabase } from '@/lib/supabase';
+import { type User } from '@supabase/supabase-js';
 
 interface ProjectDetail {
   id: number;
@@ -41,7 +42,7 @@ export default function ProjectPage() {
   const projectId = params?.id as string;
 
   const [project, setProject] = useState<ProjectDetail | null>(null);
-  const [relatedProjects, setRelatedProjects] = useState<any[]>([]);
+  const [relatedProjects, setRelatedProjects] = useState<ProjectDetail[]>([]);
   const [relatedTab, setRelatedTab] = useState<'author' | 'remix'>('author');
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -50,17 +51,18 @@ export default function ProjectPage() {
   const [isDescExpanded, setIsDescExpanded] = useState(false);
 
   const [isBookmarked, setIsBookmarked] = useState(false);
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [bookmarkLoading, setBookmarkLoading] = useState(false);
 
-  const [playerType, setPlayerType] = useState<'turbowarp' | 'scratch'>('turbowarp');
-
-  useEffect(() => {
+  
+  const [playerType] = useState<'turbowarp' | 'scratch'>(() => {
+  // Next.jsのサーバー側（windowが存在しない環境）でのエラーを防ぐおまじない
+  if (typeof window !== 'undefined') {
     const savedPlayer = localStorage.getItem('player_type');
-    if (savedPlayer === 'scratch') {
-      setPlayerType('scratch');
-    }
-  }, []);
+    if (savedPlayer === 'scratch') return 'scratch';
+  }
+  return 'turbowarp'; // デフォルト値
+});
 
   useEffect(() => {
     const checkBookmark = async () => {
@@ -81,6 +83,21 @@ export default function ProjectPage() {
     if (projectId) checkBookmark();
   }, [projectId]);
 
+  const fetchRelated = useCallback(async (username: string, type: 'author' | 'remix') => {
+    try {
+      const url = type === 'author' 
+        ? `/proxy/scratch/users/${username}/projects?limit=12` 
+        : `/proxy/scratch/projects/${projectId}/remixes?limit=12`;
+      const res = await fetch(url);
+      if (!res.ok) return;
+      const data = await res.json();
+      setRelatedProjects(data);
+    } catch (e) {
+      console.error(e);
+      setRelatedProjects([]);
+    }
+  }, [projectId]);
+  
   useEffect(() => {
     if (!projectId) return;
 
@@ -99,31 +116,24 @@ export default function ProjectPage() {
         const data = await res.json();
         setProject(data);
         fetchRelated(data.author.username, 'author');
-      } catch (error: any) {
-        console.error(error);
-        setErrorMsg(error.message || 'データの取得に失敗しました');
+      } catch (error: unknown) {
+      console.error(error);
+      if (error instanceof Error) {
+        // エラーが標準的な Error オブジェクトだった場合
+        setErrorMsg(error.message);
+      } else {
+        // それ以外のよく分からないエラーだった場合
+        setErrorMsg('データの取得に失敗しました');
+      }
       } finally {
         setLoading(false);
       }
     };
 
     fetchProjectData();
-  }, [projectId]);
+  }, [projectId, fetchRelated]);
 
-  const fetchRelated = async (username: string, type: 'author' | 'remix') => {
-    try {
-      let url = type === 'author' 
-        ? `/proxy/scratch/users/${username}/projects?limit=12` 
-        : `/proxy/scratch/projects/${projectId}/remixes?limit=12`;
-      const res = await fetch(url);
-      if (!res.ok) return;
-      const data = await res.json();
-      setRelatedProjects(data);
-    } catch (e) {
-      console.error(e);
-      setRelatedProjects([]);
-    }
-  };
+  
 
   const handleTabChange = (tab: 'author' | 'remix') => {
     setRelatedTab(tab);
@@ -140,9 +150,9 @@ export default function ProjectPage() {
     setBookmarkLoading(true);
 
     const { data } = await supabase.from('profiles').select('bookmarked_projects').eq('id', user.id).single();
-    let currentBookmarks = data?.bookmarked_projects || [];
+    const currentBookmarks = data?.bookmarked_projects || [];
     
-    let newBookmarks = isBookmarked 
+    const newBookmarks = isBookmarked 
       ? currentBookmarks.filter((id: string) => id !== projectId)
       : [...currentBookmarks, projectId];
     
@@ -199,6 +209,7 @@ export default function ProjectPage() {
                 className="flex items-center gap-3 cursor-pointer p-2 -ml-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
                 onClick={() => setIsModalOpen(true)}
               >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img 
                   src={`https://cdn2.scratch.mit.edu/get_image/user/${project.author.id}_60x60.png`} 
                   alt={project.author.username} 
@@ -328,6 +339,7 @@ export default function ProjectPage() {
               relatedProjects.map((relProject) => (
                 <Link href={`/${relProject.id}`} key={relProject.id} className="flex gap-3 group hover:bg-gray-50 dark:hover:bg-gray-800/50 p-2 -mx-2 rounded-xl transition-colors">
                   <div className="w-40 aspect-[4/3] flex-shrink-0 bg-gray-200 dark:bg-gray-700 rounded-lg overflow-hidden relative">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img 
                       src={relProject.image || `https://cdn2.scratch.mit.edu/get_image/project/${relProject.id}_480x360.png`} 
                       alt={relProject.title}

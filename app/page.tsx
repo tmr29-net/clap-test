@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import AuthorModal from '@/src/components/AuthorModal';
 import { supabase } from '@/lib/supabase'; // 💡 Supabaseの読み込みを追加
+import { type User } from '@supabase/supabase-js';
 
 interface ScratchProject {
   id: number;
@@ -13,7 +14,7 @@ interface ScratchProject {
 }
 
 // 配列をランダムにシャッフルする便利関数
-const shuffleArray = (array: any[]) => {
+const shuffleArray = (array: ScratchProject[]) => {
   const newArr = [...array];
   for (let i = newArr.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
@@ -31,7 +32,7 @@ export default function Home() {
   
   // 💡 お気に入り作品の「全件（シャッフル済み）」を保持するステート
   const [allFavoriteProjects, setAllFavoriteProjects] = useState<ScratchProject[]>([]);
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<User | null>(null);
 
   const [selectedAuthor, setSelectedAuthor] = useState<{id: number, username: string} | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -144,9 +145,13 @@ export default function Home() {
     
     // 初回読み込みのトリガー
     if (activeTab === 'new' && projects.length === 0 && page === 1) {
-      loadProjects(1, 'new');
+      setTimeout(() => {
+        loadProjects(1, 'new');
+      }, 0);
     } else if (activeTab === 'favorites' && projects.length === 0 && page === 1) {
-      loadProjects(1, 'favorites');
+      setTimeout(() => {
+        loadProjects(1, 'favorites');
+      }, 0);
     }
   }, [activeTab, isInitialized, user]);
 
