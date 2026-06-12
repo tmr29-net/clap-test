@@ -1,47 +1,44 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react'; // ⭕️ useCallback を追加
-import { supabase } from '@/lib/supabase'; // パスは環境に合わせてください
+import { useState, useEffect, useCallback } from 'react';
+import Link from 'next/link'; // 💡 ページ遷移用の Link を追加
+import { supabase } from '@/lib/supabase';
 import { type User } from '@supabase/supabase-js';
 
-// プロフィール用の型を定義しておきます
 type Profile = {
   username?: string;
   login_id?: string;
-  [key: string]: unknown; // 将来他のデータ（アイコン画像など）が増えてもエラーにならないようにするおまじない
+  [key: string]: unknown;
 };
-
 
 export default function AccountPage() {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // 💡 サインイン・新規登録用のステート
   const [isSignUp, setIsSignUp] = useState(false);
   const [loginId, setLoginId] = useState('');
   const [authPassword, setAuthPassword] = useState('');
   const [authUsername, setAuthUsername] = useState('');
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-  // 💡 設定変更用のステート
   const [editUsername, setEditUsername] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [isUpdating, setIsUpdating] = useState(false);
 
-  // アプリ設定用のステート
-  const [isDarkMode, setIsDarkMode] = useState(false);
+  const [isDarkMode] = useState(false);
   const [playerType, setPlayerType] = useState<'turbowarp' | 'scratch'>('turbowarp');
 
-  // ユーザー情報の取得（使い回せるように関数化 ＋ Lint対策でuseCallbackで包む）
   const fetchUser = useCallback(async () => {
     setLoading(true);
     const { data: { session } } = await supabase.auth.getSession();
     if (session?.user) {
       setUser(session.user);
       const { data } = await supabase.from('profiles').select('*').eq('id', session.user.id).single();
-      setProfile(data);
-      if (data) setEditUsername(data.username || ''); // 初期値をセット
+      if (data) {
+        setProfile(data);
+        setEditUsername(data.username || '');
+      }
     } else {
       setUser(null);
     }
@@ -49,48 +46,25 @@ export default function AccountPage() {
   }, []);
 
   useEffect(() => {
-    // 💡 修正：ページを開いた時にユーザー情報を取得し、無限ローディングを防ぐ
     fetchUser();
 
-    // ダークモードの初期状態チェック
     if (document.documentElement.classList.contains('dark') || localStorage.getItem('theme') === 'dark') {
-      setTimeout(() => {
-        setIsDarkMode(true);
-      }, 0);
       document.documentElement.classList.add('dark');
     }
     
-    // プレイヤーの初期状態チェック
     const savedPlayer = localStorage.getItem('player_type');
     if (savedPlayer === 'scratch') {
       setTimeout(() => {
         setPlayerType('scratch');
       }, 0);
     }
-  }, [fetchUser]); // ⭕️ 依存配列に fetchUser を指定
+  }, [fetchUser]);
 
-  // 🌙 ダークモード切り替え処理
-  const toggleDarkMode = () => {
-    if (isDarkMode) {
-      document.documentElement.classList.remove('dark');
-      localStorage.setItem('theme', 'light');
-      setIsDarkMode(false);
-    } else {
-      document.documentElement.classList.add('dark');
-      localStorage.setItem('theme', 'dark');
-      setIsDarkMode(true);
-    }
-  };
-
-  // 🎮 プレイヤー切り替え処理
   const togglePlayerType = (type: 'turbowarp' | 'scratch') => {
     setPlayerType(type);
     localStorage.setItem('player_type', type);
   };
 
-  // ==========================================
-  // 💡 認証機能（サインイン・サインアップ）
-  // ==========================================
   const makeDummyEmail = (id: string) => `${id.trim()}@clap.local`;
 
   const handleSignUp = async (e: React.FormEvent) => {
@@ -130,10 +104,6 @@ export default function AccountPage() {
     fetchUser();
   };
 
-
-  // ==========================================
-  // 💡 プロフィール＆パスワード更新処理
-  // ==========================================
   const handleUpdateProfile = async () => {
     if (!user) return;
     setIsUpdating(true);
@@ -163,7 +133,6 @@ export default function AccountPage() {
     }
   };
 
-  // アカウント削除＆サインアウト処理
   const handleDeleteAccount = async () => {
     if (!window.confirm('本当にアカウントを削除しますか？この操作は取り消せません。')) return;
     alert('セキュリティ上、現在アカウントの完全削除は管理者のみ可能です。サインアウトを実行します。');
@@ -178,10 +147,10 @@ export default function AccountPage() {
 
   if (loading) return <div className="text-center mt-20 text-gray-500 dark:text-gray-400">読み込み中...</div>;
 
-  // 💡 未ログイン時：サインイン・新規登録フォームを表示
+  // 💡 未ログイン時の画面
   if (!user) {
     return (
-      <div className="max-w-md mx-auto mt-12 px-4">
+      <div className="max-w-md mx-auto mt-12 px-4 flex flex-col min-h-[80vh] justify-between py-6">
         <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl p-6 shadow-sm transition-colors">
           <h1 className="text-xl font-bold text-gray-900 dark:text-white mb-6 flex items-center gap-2">
             <span>👤</span> {isSignUp ? '新規アカウント作成' : 'サインイン'}
@@ -208,12 +177,11 @@ export default function AccountPage() {
 
             {isSignUp && (
               <div>
-                <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1.5">表示名 (省略時は user-ID)</label>
+                <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1.5">アカウント名</label>
                 <input
                   type="text"
                   value={authUsername}
                   onChange={(e) => setAuthUsername(e.target.value)}
-                  placeholder="Clap太郎"
                   className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white rounded-xl text-sm focus:outline-none focus:bg-white dark:focus:bg-gray-800 focus:border-gray-900 dark:focus:border-gray-400 transition-all"
                 />
               </div>
@@ -247,101 +215,115 @@ export default function AccountPage() {
             </div>
           </form>
         </div>
+
+        {/* 💡 未ログイン画面用の最下部リンク */}
+        <div className="text-center pt-8">
+          <Link href="/about" className="text-xs text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:underline transition-colors">
+            このサイトについて（免責事項）
+          </Link>
+        </div>
       </div>
     );
   }
 
-  // 💡 ログイン済み：設定画面を表示
+  // 💡 ログイン済みの画面
   return (
-    <div className="max-w-2xl mx-auto px-4 py-8">
-      <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-8">アカウント設定</h1>
+    <div className="max-w-2xl mx-auto px-4 py-8 flex flex-col min-h-[85vh] justify-between">
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-8">アカウント設定</h1>
 
-      {/* プロフィール設定セクション */}
-      <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm mb-6 border border-gray-100 dark:border-gray-700 transition-colors">
-        <h2 className="text-lg font-semibold mb-4 dark:text-white">プロフィールとセキュリティ</h2>
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm text-gray-500 dark:text-gray-400 mb-1">ユーザー名</label>
-            <input 
-              type="text" 
-              value={editUsername}
-              onChange={(e) => setEditUsername(e.target.value)}
-              className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:text-white transition-colors"
-            />
-          </div>
-          <div>
-            <label className="block text-sm text-gray-500 dark:text-gray-400 mb-1">ログインID</label>
-            <input 
-              type="text" 
-              defaultValue={profile?.login_id || ''} 
-              disabled 
-              className="w-full px-4 py-2 bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-gray-500 dark:text-gray-400 cursor-not-allowed transition-colors"
-            />
-            <p className="text-xs text-gray-400 mt-1">※ログインIDは変更できません</p>
-          </div>
-          <div>
-            <label className="block text-sm text-gray-500 dark:text-gray-400 mb-1">新しいパスワード</label>
-            <input 
-              type="password" 
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-              placeholder="変更する場合のみ入力"
-              className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:text-white transition-colors"
-            />
-          </div>
-          <button 
-            onClick={handleUpdateProfile}
-            disabled={isUpdating}
-            className="px-6 py-2 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-lg text-sm font-medium hover:opacity-80 transition-opacity disabled:opacity-50 mt-2"
-          >
-            {isUpdating ? '更新中...' : '設定を保存'}
-          </button>
-        </div>
-      </div>
-
-      {/* アプリ設定セクション */}
-      <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm mb-6 border border-gray-100 dark:border-gray-700 transition-colors">
-        <h2 className="text-lg font-semibold mb-4 dark:text-white">アプリ設定</h2>
-        
-        
-
-        <div className="py-3 mt-2">
-          <p className="font-medium dark:text-white mb-1">デフォルトプレイヤー</p>
-          <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">プロジェクト再生画面で使用するプレイヤー</p>
-          <div className="flex space-x-3">
+        {/* プロフィール設定セクション */}
+        <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm mb-6 border border border-gray-100 dark:border-gray-700 transition-colors">
+          <h2 className="text-lg font-semibold mb-4 dark:text-white">プロフィールとセキュリティ</h2>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm text-gray-500 dark:text-gray-400 mb-1">ユーザー名</label>
+              <input 
+                type="text" 
+                value={editUsername}
+                onChange={(e) => setEditUsername(e.target.value)}
+                className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:text-white transition-colors"
+              />
+            </div>
+            <div>
+              <label className="block text-sm text-gray-500 dark:text-gray-400 mb-1">ログインID</label>
+              <input 
+                type="text" 
+                defaultValue={profile?.login_id || ''} 
+                disabled 
+                className="w-full px-4 py-2 bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-gray-500 dark:text-gray-400 cursor-not-allowed transition-colors"
+              />
+              <p className="text-xs text-gray-400 mt-1">※ログインIDは変更できません</p>
+            </div>
+            <div>
+              <label className="block text-sm text-gray-500 dark:text-gray-400 mb-1">新しいパスワード</label>
+              <input 
+                type="password" 
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="変更する場合のみ入力"
+                className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:text-white transition-colors"
+              />
+            </div>
             <button 
-              onClick={() => togglePlayerType('turbowarp')}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors border ${playerType === 'turbowarp' ? 'bg-blue-50 border-blue-200 text-blue-700 dark:bg-blue-900/30 dark:border-blue-800 dark:text-blue-300' : 'bg-gray-50 border-gray-200 text-gray-600 dark:bg-gray-900 dark:border-gray-700 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'}`}
+              onClick={handleUpdateProfile}
+              disabled={isUpdating}
+              className="px-6 py-2 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-lg text-sm font-medium hover:opacity-80 transition-opacity disabled:opacity-50 mt-2"
             >
-              TurboWarp (推奨)
-            </button>
-            <button 
-              onClick={() => togglePlayerType('scratch')}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors border ${playerType === 'scratch' ? 'bg-blue-50 border-blue-200 text-blue-700 dark:bg-blue-900/30 dark:border-blue-800 dark:text-blue-300' : 'bg-gray-50 border-gray-200 text-gray-600 dark:bg-gray-900 dark:border-gray-700 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'}`}
-            >
-              Scratch公式
+              {isUpdating ? '更新中...' : '設定を保存'}
             </button>
           </div>
         </div>
+
+        {/* アプリ設定セクション */}
+        <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm mb-6 border border-gray-100 dark:border-gray-700 transition-colors">
+          <h2 className="text-lg font-semibold mb-4 dark:text-white">アプリ設定</h2>
+          
+          <div className="py-3 mt-2">
+            <p className="font-medium dark:text-white mb-1">デフォルトプレイヤー</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">プロジェクト再生画面で使用するプレイヤー</p>
+            <div className="flex space-x-3">
+              <button 
+                onClick={() => togglePlayerType('turbowarp')}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors border ${playerType === 'turbowarp' ? 'bg-blue-50 border-blue-200 text-blue-700 dark:bg-blue-900/30 dark:border-blue-800 dark:text-blue-300' : 'bg-gray-50 border-gray-200 text-gray-600 dark:bg-gray-900 dark:border-gray-700 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'}`}
+              >
+                TurboWarp (推奨)
+              </button>
+              <button 
+                onClick={() => togglePlayerType('scratch')}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors border ${playerType === 'scratch' ? 'bg-blue-50 border-blue-200 text-blue-700 dark:bg-blue-900/30 dark:border-blue-800 dark:text-blue-300' : 'bg-gray-50 border-gray-200 text-gray-600 dark:bg-gray-900 dark:border-gray-700 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'}`}
+              >
+                Scratch公式
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* 危険な操作セクション */}
+        <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm border border-red-100 dark:border-red-900/30 transition-colors">
+          <h2 className="text-lg font-semibold mb-4 text-red-600 dark:text-red-400">アカウント管理</h2>
+          <div className="flex flex-col space-y-3">
+            <button 
+              onClick={handleSignOut}
+              className="w-full py-2.5 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg text-sm font-medium hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+            >
+              サインアウト
+            </button>
+            <button 
+              onClick={handleDeleteAccount}
+              className="w-full py-2.5 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 border border-red-100 dark:border-red-900/30 rounded-lg text-sm font-medium hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors"
+            >
+              アカウントを完全に削除する
+            </button>
+          </div>
+        </div>
       </div>
 
-      {/* 危険な操作セクション */}
-      <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm border border-red-100 dark:border-red-900/30 transition-colors">
-        <h2 className="text-lg font-semibold mb-4 text-red-600 dark:text-red-400">アカウント管理</h2>
-        <div className="flex flex-col space-y-3">
-          <button 
-            onClick={handleSignOut}
-            className="w-full py-2.5 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg text-sm font-medium hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
-          >
-            サインアウト
-          </button>
-          <button 
-            onClick={handleDeleteAccount}
-            className="w-full py-2.5 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 border border-red-100 dark:border-red-900/30 rounded-lg text-sm font-medium hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors"
-          >
-            アカウントを完全に削除する
-          </button>
-        </div>
+      {/* 💡 ログイン画面用の最下部リンク */}
+      <div className="text-center pt-12 pb-4">
+        <Link href="/about" className="text-xs text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:underline transition-colors">
+          このサイトについて（免責事項）
+        </Link>
       </div>
 
     </div>

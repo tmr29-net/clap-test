@@ -18,6 +18,7 @@ interface ProjectDetail {
   image: string;
 }
 
+// 💡 コメント用の型を拡張（返信対応）
 interface CommentData {
   id: number;
   content: string;
@@ -27,6 +28,12 @@ interface CommentData {
     image: string;
   };
   datetime_created: string;
+  reply_count: number; // 💡 Scratch APIが返してくる返信の数
+
+  // 💡 クライアント側で表示を管理するための追加プロパティ
+  replies?: CommentData[];
+  repliesLoading?: boolean;
+  repliesVisible?: boolean;
 }
 
 const linkify = (text: string) => {
@@ -75,7 +82,7 @@ export default function ProjectPage() {
   const [commentsLoading, setCommentsLoading] = useState(false);
   const [commentsOffset, setCommentsOffset] = useState(0);
   const [hasMoreComments, setHasMoreComments] = useState(true);
-  const [commentError, setCommentError] = useState<string | null>(null); // 💡 画面内エラー用
+  const [commentError, setCommentError] = useState<string | null>(null);
 
   const [playerType] = useState<'turbowarp' | 'scratch'>(() => {
     if (typeof window !== 'undefined') {
@@ -162,14 +169,13 @@ export default function ProjectPage() {
     fetchProjectData();
   }, [projectId, fetchRelated]);
 
-  // 💡 コメントの取得関数を正しいURLに修正
+  // 親コメントの取得
   const fetchComments = async () => {
     if (commentsLoading || !hasMoreComments || !project) return;
     setCommentsLoading(true);
     setCommentError(null);
     try {
       const limit = 20; 
-      // 💡 パスに `users/${project.author.username}` を追加
       const res = await fetch(`/proxy/scratch/users/${project.author.username}/projects/${projectId}/comments?offset=${commentsOffset}&limit=${limit}`);
       
       if (!res.ok) throw new Error('コメントの取得に失敗しました');
@@ -195,6 +201,40 @@ export default function ProjectPage() {
   const handleShowComments = () => {
     setIsCommentsVisible(true);
     fetchComments();
+  };
+
+  // 💡 返信（リプライ）の取得と表示切り替え
+  const toggleReplies = async (commentId: number) => {
+    // 既にデータがある場合は、表示/非表示を切り替えるだけ
+    const targetComment = comments.find(c => c.id === commentId);
+    if (targetComment?.replies) {
+      setComments(prev => prev.map(c => c.id === commentId ? { ...c, repliesVisible: !c.repliesVisible } : c));
+      return;
+    }
+
+    if (!project) return;
+
+    // ローディング状態をオンにする
+    setComments(prev => prev.map(c => c.id === commentId ? { ...c, repliesLoading: true } : c));
+
+    try {
+      const res = await fetch(`/proxy/scratch/users/${project.author.username}/projects/${projectId}/comments/${commentId}/replies`);
+      if (!res.ok) throw new Error('返信の取得に失敗しました');
+      
+      const data = await res.json();
+      
+      // 取得したデータをセットし、表示状態をONにする
+      setComments(prev => prev.map(c => c.id === commentId ? { 
+        ...c, 
+        replies: data, 
+        repliesVisible: true, 
+        repliesLoading: false 
+      } : c));
+    } catch (error) {
+      console.error(error);
+      setComments(prev => prev.map(c => c.id === commentId ? { ...c, repliesLoading: false } : c));
+      alert('返信の読み込みに失敗しました。');
+    }
   };
 
   const handleTabChange = (tab: 'author' | 'remix') => {
@@ -384,7 +424,7 @@ export default function ProjectPage() {
             </button>
           </div>
 
-          {/* 💡 コメントセクション（ボタンから絵文字を排除＆エラー表示強化） */}
+          {/* コメントセクション */}
           <div className="mt-8 border-t border-gray-200 dark:border-gray-800 pt-8">
             <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">コメント</h3>
             
@@ -397,7 +437,6 @@ export default function ProjectPage() {
               </button>
             ) : (
               <div className="flex flex-col gap-6">
-                {/* エラーメッセージがある場合は画面内に表示 */}
                 {commentError && (
                   <p className="text-red-500 text-sm text-center py-2 font-medium">{commentError}</p>
                 )}
@@ -411,9 +450,9 @@ export default function ProjectPage() {
                       <img 
                         src={comment.author.image || `https://cdn2.scratch.mit.edu/get_image/user/${comment.author.id || 0}_60x60.png`} 
                         alt={comment.author.username} 
-                        className="w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-700 flex-shrink-0"
+                        className="w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-700 flex-shrink-0 mt-1"
                       />
-                      <div className="flex-1">
+                      <div className="flex-1 min-w-0">
                         <div className="flex items-baseline gap-2 mb-1">
                           <span className="font-bold text-sm text-gray-900 dark:text-white">{comment.author.username}</span>
                           <span className="text-xs text-gray-500 dark:text-gray-400">
@@ -423,6 +462,50 @@ export default function ProjectPage() {
                         <p className="text-sm text-gray-800 dark:text-gray-200 whitespace-pre-wrap break-words">
                           {linkify(comment.content)}
                         </p>
+
+                        {/* 💡 返信ボタン */}
+                        {comment.reply_count > 0 && (
+                          <button 
+                            onClick={() => toggleReplies(comment.id)}
+                            disabled={comment.repliesLoading}
+                            className="mt-2 text-xs font-bold text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors flex items-center gap-1"
+                          >
+                            {comment.repliesLoading ? (
+                              '読み込み中...'
+                            ) : comment.repliesVisible ? (
+                              '▲ 返信を閉じる'
+                            ) : (
+                              `▼ 返信 ${comment.reply_count} 件を表示`
+                            )}
+                          </button>
+                        )}
+
+                        {/* 💡 返信リストの表示 */}
+                        {comment.repliesVisible && comment.replies && (
+                          <div className="mt-4 flex flex-col gap-4 border-l-2 border-gray-200 dark:border-gray-700 pl-4 ml-1">
+                            {comment.replies.map((reply) => (
+                              <div key={reply.id} className="flex gap-3">
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img 
+                                  src={reply.author.image || `https://cdn2.scratch.mit.edu/get_image/user/${reply.author.id || 0}_60x60.png`} 
+                                  alt={reply.author.username} 
+                                  className="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700 flex-shrink-0 mt-0.5"
+                                />
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-baseline gap-2 mb-1">
+                                    <span className="font-bold text-xs text-gray-900 dark:text-white">{reply.author.username}</span>
+                                    <span className="text-[10px] text-gray-500 dark:text-gray-400">
+                                      {new Date(reply.datetime_created).toLocaleDateString()}
+                                    </span>
+                                  </div>
+                                  <p className="text-sm text-gray-800 dark:text-gray-200 whitespace-pre-wrap break-words">
+                                    {linkify(reply.content)}
+                                  </p>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     </div>
                   ))
@@ -446,6 +529,7 @@ export default function ProjectPage() {
 
         </div>
 
+        {/* --- 右側のサイドバー部分は変更なし --- */}
         <div className="w-full lg:w-[35%] xl:w-[30%] mt-8 lg:mt-0">
           <div className="flex gap-2 mb-4">
             <button 

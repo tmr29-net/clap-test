@@ -46,7 +46,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           <div className="flex-1 flex justify-center">
             <input 
               type="text" 
-              placeholder="検索 (Enterで実行)..." 
+              placeholder="検索" 
               className="w-1/2 max-w-lg p-2 px-4 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
