@@ -1,8 +1,10 @@
 'use client';
-import { useState, useEffect, useCallback} from 'react';
+
+import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import AuthorModal from '@/src/components/AuthorModal';
+import ReportModal from '@/src/components/ReportModal';
 import { supabase } from '@/lib/supabase';
 import { type User } from '@supabase/supabase-js';
 
@@ -14,6 +16,17 @@ interface ProjectDetail {
   author: { id: number; username: string };
   stats: { views: number; loves: number; favorites: number; remixes: number };
   image: string;
+}
+
+interface CommentData {
+  id: number;
+  content: string;
+  author: {
+    id: number;
+    username: string;
+    image: string;
+  };
+  datetime_created: string;
 }
 
 const linkify = (text: string) => {
@@ -54,15 +67,23 @@ export default function ProjectPage() {
   const [user, setUser] = useState<User | null>(null);
   const [bookmarkLoading, setBookmarkLoading] = useState(false);
 
-  
+  const [isReportModalOpen, setIsReportModalOpen] = useState(false);
+
+  // コメント機能用のステート
+  const [comments, setComments] = useState<CommentData[]>([]);
+  const [isCommentsVisible, setIsCommentsVisible] = useState(false);
+  const [commentsLoading, setCommentsLoading] = useState(false);
+  const [commentsOffset, setCommentsOffset] = useState(0);
+  const [hasMoreComments, setHasMoreComments] = useState(true);
+  const [commentError, setCommentError] = useState<string | null>(null); // 💡 画面内エラー用
+
   const [playerType] = useState<'turbowarp' | 'scratch'>(() => {
-  // Next.jsのサーバー側（windowが存在しない環境）でのエラーを防ぐおまじない
-  if (typeof window !== 'undefined') {
-    const savedPlayer = localStorage.getItem('player_type');
-    if (savedPlayer === 'scratch') return 'scratch';
-  }
-  return 'turbowarp'; // デフォルト値
-});
+    if (typeof window !== 'undefined') {
+      const savedPlayer = localStorage.getItem('player_type');
+      if (savedPlayer === 'scratch') return 'scratch';
+    }
+    return 'turbowarp';
+  });
 
   useEffect(() => {
     const checkBookmark = async () => {
@@ -105,6 +126,16 @@ export default function ProjectPage() {
       setLoading(true);
       setErrorMsg(null);
       try {
+        const { data: blacklisted } = await supabase
+          .from('blacklists')
+          .select('project_id')
+          .eq('project_id', projectId)
+          .maybeSingle();
+
+        if (blacklisted) {
+          throw new Error('この作品は管理者の設定により閲覧できません。');
+        }
+
         const res = await fetch(`/proxy/scratch/projects/${projectId}`);
         
         if (!res.ok) {
@@ -117,14 +148,12 @@ export default function ProjectPage() {
         setProject(data);
         fetchRelated(data.author.username, 'author');
       } catch (error: unknown) {
-      console.error(error);
-      if (error instanceof Error) {
-        // エラーが標準的な Error オブジェクトだった場合
-        setErrorMsg(error.message);
-      } else {
-        // それ以外のよく分からないエラーだった場合
-        setErrorMsg('データの取得に失敗しました');
-      }
+        console.error(error);
+        if (error instanceof Error) {
+          setErrorMsg(error.message);
+        } else {
+          setErrorMsg('データの取得に失敗しました');
+        }
       } finally {
         setLoading(false);
       }
@@ -133,7 +162,40 @@ export default function ProjectPage() {
     fetchProjectData();
   }, [projectId, fetchRelated]);
 
-  
+  // 💡 コメントの取得関数を正しいURLに修正
+  const fetchComments = async () => {
+    if (commentsLoading || !hasMoreComments || !project) return;
+    setCommentsLoading(true);
+    setCommentError(null);
+    try {
+      const limit = 20; 
+      // 💡 パスに `users/${project.author.username}` を追加
+      const res = await fetch(`/proxy/scratch/users/${project.author.username}/projects/${projectId}/comments?offset=${commentsOffset}&limit=${limit}`);
+      
+      if (!res.ok) throw new Error('コメントの取得に失敗しました');
+      
+      const data = await res.json();
+      
+      if (!Array.isArray(data) || data.length < limit) {
+        setHasMoreComments(false);
+      }
+      
+      if (Array.isArray(data)) {
+        setComments(prev => [...prev, ...data]);
+        setCommentsOffset(prev => prev + limit);
+      }
+    } catch (error) {
+      console.error(error);
+      setCommentError('コメントの読み込みに失敗しました。時間をおいて再度お試しください。');
+    } finally {
+      setCommentsLoading(false);
+    }
+  };
+
+  const handleShowComments = () => {
+    setIsCommentsVisible(true);
+    fetchComments();
+  };
 
   const handleTabChange = (tab: 'author' | 'remix') => {
     setRelatedTab(tab);
@@ -186,7 +248,7 @@ export default function ProjectPage() {
     : `https://turbowarp.org/${projectId}/embed?addons=pause`;
 
   return (
-    <div className="max-w-[1600px] mx-auto px-4 md:px-6 py-4">
+    <div className="max-w-[1600px] mx-auto px-4 md:px-6 py-4 relative">
       <div className="flex flex-col lg:flex-row gap-6">
         
         <div className="w-full lg:w-[65%] xl:w-[70%]">
@@ -312,6 +374,76 @@ export default function ProjectPage() {
               </button>
             )}
           </div>
+
+          <div className="mt-3 flex justify-end">
+            <button 
+              onClick={() => setIsReportModalOpen(true)} 
+              className="text-xs text-gray-400 dark:text-gray-500 hover:text-red-500 dark:hover:text-red-400 transition-colors flex items-center gap-1 font-medium"
+            >
+              ⚠️ このプロジェクトを報告する
+            </button>
+          </div>
+
+          {/* 💡 コメントセクション（ボタンから絵文字を排除＆エラー表示強化） */}
+          <div className="mt-8 border-t border-gray-200 dark:border-gray-800 pt-8">
+            <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">コメント</h3>
+            
+            {!isCommentsVisible ? (
+              <button 
+                onClick={handleShowComments}
+                className="w-full py-3 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-800 dark:text-gray-200 font-bold rounded-xl transition-colors"
+              >
+                コメントを表示する
+              </button>
+            ) : (
+              <div className="flex flex-col gap-6">
+                {/* エラーメッセージがある場合は画面内に表示 */}
+                {commentError && (
+                  <p className="text-red-500 text-sm text-center py-2 font-medium">{commentError}</p>
+                )}
+
+                {comments.length === 0 && !commentsLoading && !commentError ? (
+                  <p className="text-gray-500 dark:text-gray-400 text-center py-4">コメントはありません。</p>
+                ) : (
+                  comments.map((comment) => (
+                    <div key={comment.id} className="flex gap-4">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img 
+                        src={comment.author.image || `https://cdn2.scratch.mit.edu/get_image/user/${comment.author.id || 0}_60x60.png`} 
+                        alt={comment.author.username} 
+                        className="w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-700 flex-shrink-0"
+                      />
+                      <div className="flex-1">
+                        <div className="flex items-baseline gap-2 mb-1">
+                          <span className="font-bold text-sm text-gray-900 dark:text-white">{comment.author.username}</span>
+                          <span className="text-xs text-gray-500 dark:text-gray-400">
+                            {new Date(comment.datetime_created).toLocaleDateString()}
+                          </span>
+                        </div>
+                        <p className="text-sm text-gray-800 dark:text-gray-200 whitespace-pre-wrap break-words">
+                          {linkify(comment.content)}
+                        </p>
+                      </div>
+                    </div>
+                  ))
+                )}
+
+                {commentsLoading && (
+                  <p className="text-center text-gray-500 dark:text-gray-400 py-2">読み込み中...</p>
+                )}
+
+                {hasMoreComments && !commentsLoading && comments.length > 0 && (
+                  <button 
+                    onClick={fetchComments}
+                    className="mt-2 py-2 text-sm font-bold text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors self-center"
+                  >
+                    さらに読み込む
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+
         </div>
 
         <div className="w-full lg:w-[35%] xl:w-[30%] mt-8 lg:mt-0">
@@ -362,7 +494,6 @@ export default function ProjectPage() {
 
       </div>
 
-      {/* 以前のパス @/src/components/AuthorModal に戻しました */}
       {project && (
         <AuthorModal 
           isOpen={isModalOpen} 
@@ -370,6 +501,14 @@ export default function ProjectPage() {
           author={project.author} 
         />
       )}
+
+      <ReportModal 
+        isOpen={isReportModalOpen} 
+        onClose={() => setIsReportModalOpen(false)} 
+        projectId={projectId} 
+        userId={user?.id} 
+      />
+
     </div>
   );
 }

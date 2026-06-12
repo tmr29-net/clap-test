@@ -1,8 +1,13 @@
+import { Metadata } from 'next';
 import './globals.css';
 import AppShell from '@/src/components/AppShell';
 
-export const metadata = {
-  title: 'Clap - Scratch Project Player',
+// 💡 ここを template を使った形に変更しました
+export const metadata: Metadata = {
+  title: {
+    default: 'Clap - Scratch Project Player',
+    template: '%s | Clap - Scratch Project Player',
+  },
   description: 'Scratchのプロジェクト閲覧・ブックマークサイト',
 };
 

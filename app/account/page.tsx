@@ -1,5 +1,6 @@
 'use client';
-import { useState, useEffect } from 'react';
+
+import { useState, useEffect, useCallback } from 'react'; // ⭕️ useCallback を追加
 import { supabase } from '@/lib/supabase'; // パスは環境に合わせてください
 import { type User } from '@supabase/supabase-js';
 
@@ -10,12 +11,13 @@ type Profile = {
   [key: string]: unknown; // 将来他のデータ（アイコン画像など）が増えてもエラーにならないようにするおまじない
 };
 
+
 export default function AccountPage() {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // 💡 【復活】サインイン・新規登録用のステート
+  // 💡 サインイン・新規登録用のステート
   const [isSignUp, setIsSignUp] = useState(false);
   const [loginId, setLoginId] = useState('');
   const [authPassword, setAuthPassword] = useState('');
@@ -31,25 +33,27 @@ export default function AccountPage() {
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [playerType, setPlayerType] = useState<'turbowarp' | 'scratch'>('turbowarp');
 
-  // ユーザー情報の取得（使い回せるように関数化）
-  const fetchUser = async () => {
+  // ユーザー情報の取得（使い回せるように関数化 ＋ Lint対策でuseCallbackで包む）
+  const fetchUser = useCallback(async () => {
     setLoading(true);
     const { data: { session } } = await supabase.auth.getSession();
     if (session?.user) {
       setUser(session.user);
       const { data } = await supabase.from('profiles').select('*').eq('id', session.user.id).single();
       setProfile(data);
-      if (data) setEditUsername(data.username); // 初期値をセット
+      if (data) setEditUsername(data.username || ''); // 初期値をセット
     } else {
       setUser(null);
     }
     setLoading(false);
-  };
+  }, []);
 
   useEffect(() => {
+    // 💡 修正：ページを開いた時にユーザー情報を取得し、無限ローディングを防ぐ
+    fetchUser();
+
     // ダークモードの初期状態チェック
     if (document.documentElement.classList.contains('dark') || localStorage.getItem('theme') === 'dark') {
-      // 👇 setTimeout で囲んで、一瞬だけ処理を遅らせる（これで Lint が黙ります）
       setTimeout(() => {
         setIsDarkMode(true);
       }, 0);
@@ -63,7 +67,7 @@ export default function AccountPage() {
         setPlayerType('scratch');
       }, 0);
     }
-  }, []);
+  }, [fetchUser]); // ⭕️ 依存配列に fetchUser を指定
 
   // 🌙 ダークモード切り替え処理
   const toggleDarkMode = () => {
@@ -85,7 +89,7 @@ export default function AccountPage() {
   };
 
   // ==========================================
-  // 💡 【復活】認証機能（サインイン・サインアップ）
+  // 💡 認証機能（サインイン・サインアップ）
   // ==========================================
   const makeDummyEmail = (id: string) => `${id.trim()}@clap.local`;
 
@@ -138,7 +142,7 @@ export default function AccountPage() {
       if (editUsername !== profile?.username) {
         const { error } = await supabase.from('profiles').update({ username: editUsername }).eq('id', user.id);
         if (error) throw error;
-        setProfile({ ...profile, username: editUsername });
+        setProfile(profile ? { ...profile, username: editUsername } : null);
       }
 
       if (newPassword.trim() !== '') {
@@ -148,15 +152,13 @@ export default function AccountPage() {
       }
       alert('設定を更新しました！');
     } catch (error: unknown) {
-  console.error(error);
-  if (error instanceof Error) {
-    // ちゃんとErrorオブジェクトだった場合
-    alert('エラーが発生しました: ' + error.message);
-  } else {
-    // それ以外のよくわからないエラーだった場合
-    alert('予期せぬエラーが発生しました');
-  }
-} finally {
+      console.error(error);
+      if (error instanceof Error) {
+        alert('エラーが発生しました: ' + error.message);
+      } else {
+        alert('予期せぬエラーが発生しました');
+      }
+    } finally {
       setIsUpdating(false);
     }
   };
@@ -301,18 +303,7 @@ export default function AccountPage() {
       <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm mb-6 border border-gray-100 dark:border-gray-700 transition-colors">
         <h2 className="text-lg font-semibold mb-4 dark:text-white">アプリ設定</h2>
         
-        <div className="flex items-center justify-between py-3 border-b border-gray-100 dark:border-gray-700">
-          <div>
-            <p className="font-medium dark:text-white">ダークモード</p>
-            <p className="text-xs text-gray-500 dark:text-gray-400">画面を暗くして目に優しくします</p>
-          </div>
-          <button 
-            onClick={toggleDarkMode}
-            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${isDarkMode ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-600'}`}
-          >
-            <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${isDarkMode ? 'translate-x-6' : 'translate-x-1'}`} />
-          </button>
-        </div>
+        
 
         <div className="py-3 mt-2">
           <p className="font-medium dark:text-white mb-1">デフォルトプレイヤー</p>
