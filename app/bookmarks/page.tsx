@@ -22,24 +22,24 @@ type Author = {
 export default function BookmarksPage() {
   const [activeTab, setActiveTab] = useState<'projects' | 'authors'>('projects');
   const [user, setUser] = useState<User | null>(null);
-  
+
   const [projects, setProjects] = useState<Project[]>([]);
   const [authors, setAuthors] = useState<Author[]>([]);
   const [loading, setLoading] = useState(true);
-  
+
 
   // 💡 プロジェクト絞り込み検索用のステート
   const [searchQuery, setSearchQuery] = useState('');
 
   // モーダル用
-  const [selectedAuthor, setSelectedAuthor] = useState<{id: number, username: string} | null>(null);
+  const [selectedAuthor, setSelectedAuthor] = useState<{ id: number, username: string } | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   useEffect(() => {
     const fetchBookmarks = async () => {
       setLoading(true);
       const { data: { session } } = await supabase.auth.getSession();
-      
+
       if (!session?.user) {
         setLoading(false);
         return;
@@ -56,7 +56,7 @@ export default function BookmarksPage() {
         // ① プロジェクトの取得
         if (profile.bookmarked_projects?.length > 0) {
           try {
-            const projectPromises = profile.bookmarked_projects.map((id: string) => 
+            const projectPromises = profile.bookmarked_projects.map((id: string) =>
               fetch(`/proxy/scratch/projects/${id}`).then(res => res.json())
             );
             const projectsData = await Promise.all(projectPromises);
@@ -75,14 +75,14 @@ export default function BookmarksPage() {
                 fetch(`/proxy/scratch/users/${username}`).then(res => res.json()),
                 fetch(`/proxy/scratch/users/${username}/projects?limit=4`).then(res => res.json())
               ]);
-              
+
               // 取得したデータを合体させて返す
               return {
                 ...userRes,
                 recentProjects: Array.isArray(projectsRes) ? projectsRes : []
               };
             });
-            
+
             const authorsData = await Promise.all(authorPromises);
             setAuthors(authorsData.filter(a => !a.code).reverse());
           } catch (e) {
@@ -97,8 +97,8 @@ export default function BookmarksPage() {
   }, []);
 
   // 💡 検索ボックスに入力された文字でプロジェクトを絞り込む
-  const filteredProjects = projects.filter(project => 
-    project.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
+  const filteredProjects = projects.filter((project: any) =>
+    project.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
     project.author?.username.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
@@ -120,18 +120,18 @@ export default function BookmarksPage() {
   return (
     <div className="max-w-[1600px] mx-auto px-4 md:px-6 py-4">
       <h1 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-2">
-        <span>🔖</span> ライブラリ
+        ライブラリ
       </h1>
 
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 border-b border-gray-200 pb-2">
         <div className="flex space-x-3">
-          <button 
+          <button
             onClick={() => setActiveTab('projects')}
             className={`px-4 py-2 rounded-lg font-medium transition-colors ${activeTab === 'projects' ? 'bg-gray-900 text-white' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'}`}
           >
             保存した作品 ({projects.length})
           </button>
-          <button 
+          <button
             onClick={() => setActiveTab('authors')}
             className={`px-4 py-2 rounded-lg font-medium transition-colors ${activeTab === 'authors' ? 'bg-gray-900 text-white' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'}`}
           >
@@ -168,15 +168,17 @@ export default function BookmarksPage() {
           <p className="text-center mt-10 text-gray-500">「{searchQuery}」に一致する作品が見つかりませんでした。</p>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-4 gap-y-7">
-            {filteredProjects.map((project, idx) => (
-              <Link href={`/${project.id}`} key={`${project.id}-${idx}`} className="flex flex-col group">
+            {filteredProjects.map((project: any, idx) => (
+              <Link href={`/project/${project.id}`} key={project.id || idx} className="flex flex-col group">
                 <div className="overflow-hidden rounded-xl mb-2 bg-gray-100 aspect-[4/3]">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img 
-                    src={project.image || `https://cdn2.scratch.mit.edu/get_image/project/${project.id}_480x360.png`} 
-                    alt={project.title} 
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={project.image || `https://cdn2.scratch.mit.edu/get_image/project/${project.id}_480x360.png`}
+                    alt={project.title || ''}
                     className="w-full h-full object-cover group-hover:scale-102 transition-transform duration-200"
                   />
+                  className="w-full h-full object-cover group-hover:scale-102 transition-transform duration-200"
+
                 </div>
                 <div className="flex flex-col px-1">
                   <h3 className="font-semibold text-sm line-clamp-2 leading-tight group-hover:text-blue-600">{project.title}</h3>
@@ -194,24 +196,24 @@ export default function BookmarksPage() {
           <div className="flex flex-col gap-10">
             {authors.map((author, idx) => (
               <div key={`${author.id}-${idx}`} className="flex flex-col">
-                
+
                 {/* 作者のヘッダー部分 */}
                 <div className="flex items-center gap-4 mb-4">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img 
-                    src={`https://cdn2.scratch.mit.edu/get_image/user/${author.id}_60x60.png`} 
-                    alt={author.username} 
+                  <img
+                    src={`https://cdn2.scratch.mit.edu/get_image/user/${author.id}_60x60.png`}
+                    alt={author.username}
                     className="w-12 h-12 rounded-full bg-gray-200 cursor-pointer hover:opacity-80 transition-opacity"
                     onClick={() => {
-                      setSelectedAuthor(author);
+                      setSelectedAuthor(author as any);
                       setIsModalOpen(true);
                     }}
                   />
                   <div>
-                    <h3 
+                    <h3
                       className="font-bold text-lg text-gray-900 cursor-pointer hover:underline"
                       onClick={() => {
-                        setSelectedAuthor(author);
+                        setSelectedAuthor(author as any);
                         setIsModalOpen(true);
                       }}
                     >
@@ -222,15 +224,16 @@ export default function BookmarksPage() {
                 </div>
 
                 {/* その作者の最新プロジェクト4件 */}
-                {author.recentProjects && author.recentProjects.length > 0 ? (
+                {/* その作者の最新プロジェクト4件 */}
+                {(author as any).recentProjects && (author as any).recentProjects.length > 0 ? (
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-                    {author.recentProjects.map((project: Project) => (
+                    {(author as any).recentProjects.map((project: any) => (
                       <Link href={`/${project.id}`} key={project.id} className="flex flex-col group">
                         <div className="overflow-hidden rounded-xl mb-2 bg-gray-100 aspect-[4/3]">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img 
-                            src={project.image || `https://cdn2.scratch.mit.edu/get_image/project/${project.id}_480x360.png`} 
-                            alt={project.title} 
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={project.image || `https://cdn2.scratch.mit.edu/get_image/project/${project.id}_480x360.png`}
+                            alt={project.title || ''}
                             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
                           />
                         </div>
@@ -249,6 +252,7 @@ export default function BookmarksPage() {
                     プロジェクトがありません。
                   </p>
                 )}
+
 
               </div>
             ))}

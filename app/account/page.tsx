@@ -26,9 +26,12 @@ export default function AccountPage() {
   const [newPassword, setNewPassword] = useState('');
   const [isUpdating, setIsUpdating] = useState(false);
 
-  const [isDarkMode] = useState(false);
-  const [playerType, setPlayerType] = useState<'turbowarp' | 'scratch'>('turbowarp');
-
+  const [playerType, setPlayerType] = useState(() => {
+  if (typeof window !== 'undefined') {
+    return localStorage.getItem('player_type') || 'turbowarp';
+  }
+  return 'turbowarp';
+});
   const fetchUser = useCallback(async () => {
     setLoading(true);
     const { data: { session } } = await supabase.auth.getSession();
@@ -46,18 +49,16 @@ export default function AccountPage() {
   }, []);
 
   useEffect(() => {
-    fetchUser();
+   const loadData = async () => {
+      await fetchUser();
+    };
+    loadData();
 
     if (document.documentElement.classList.contains('dark') || localStorage.getItem('theme') === 'dark') {
       document.documentElement.classList.add('dark');
     }
     
-    const savedPlayer = localStorage.getItem('player_type');
-    if (savedPlayer === 'scratch') {
-      setTimeout(() => {
-        setPlayerType('scratch');
-      }, 0);
-    }
+    
   }, [fetchUser]);
 
   const togglePlayerType = (type: 'turbowarp' | 'scratch') => {

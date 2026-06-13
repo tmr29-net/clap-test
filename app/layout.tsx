@@ -8,8 +8,11 @@ export const metadata: Metadata = {
     default: 'Clap - Scratch Project Player',
     template: '%s | Clap - Scratch Project Player',
   },
+  manifest: "/manifest.json", // ✨ これを追加！
+    themeColor: "#ffffff",      // ✨ これを追加！（スマホ上部のバーの色になります）
   description: 'Scratchのプロジェクト閲覧・ブックマークサイト',
 };
+
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (

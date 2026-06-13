@@ -54,9 +54,9 @@ export default function AuthorModal({ isOpen, onClose, author }: AuthorModalProp
     
     let newBookmarks;
     if (isBookmarked) {
-      newBookmarks = currentBookmarks.filter((name: string) => name !== author.username);
+      newBookmarks = currentBookmarks.filter((name: string) => name !== (author as any).username);
     } else {
-      newBookmarks = [...currentBookmarks, author.username];
+      newBookmarks = [...currentBookmarks, (author as any).username];
     }
     
     const { error } = await supabase.from('profiles').update({ bookmarked_authors: newBookmarks }).eq('id', user.id);
