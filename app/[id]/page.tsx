@@ -18,7 +18,6 @@ interface ProjectDetail {
   image: string;
 }
 
-// 💡 コメント用の型を拡張（返信対応）
 interface CommentData {
   id: number;
   content: string;
@@ -28,9 +27,7 @@ interface CommentData {
     image: string;
   };
   datetime_created: string;
-  reply_count: number; // 💡 Scratch APIが返してくる返信の数
-
-  // 💡 クライアント側で表示を管理するための追加プロパティ
+  reply_count: number;
   replies?: CommentData[];
   repliesLoading?: boolean;
   repliesVisible?: boolean;
@@ -76,7 +73,9 @@ export default function ProjectPage() {
 
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
 
-  // コメント機能用のステート
+  // 💡 スマホ用の独自フルスクリーン管理ステート
+  const [isFakeFullscreen, setIsFakeFullscreen] = useState(false);
+
   const [comments, setComments] = useState<CommentData[]>([]);
   const [isCommentsVisible, setIsCommentsVisible] = useState(false);
   const [commentsLoading, setCommentsLoading] = useState(false);
@@ -169,7 +168,6 @@ export default function ProjectPage() {
     fetchProjectData();
   }, [projectId, fetchRelated]);
 
-  // 親コメントの取得
   const fetchComments = async () => {
     if (commentsLoading || !hasMoreComments || !project) return;
     setCommentsLoading(true);
@@ -203,9 +201,7 @@ export default function ProjectPage() {
     fetchComments();
   };
 
-  // 💡 返信（リプライ）の取得と表示切り替え
   const toggleReplies = async (commentId: number) => {
-    // 既にデータがある場合は、表示/非表示を切り替えるだけ
     const targetComment = comments.find(c => c.id === commentId);
     if (targetComment?.replies) {
       setComments(prev => prev.map(c => c.id === commentId ? { ...c, repliesVisible: !c.repliesVisible } : c));
@@ -213,8 +209,6 @@ export default function ProjectPage() {
     }
 
     if (!project) return;
-
-    // ローディング状態をオンにする
     setComments(prev => prev.map(c => c.id === commentId ? { ...c, repliesLoading: true } : c));
 
     try {
@@ -223,7 +217,6 @@ export default function ProjectPage() {
       
       const data = await res.json();
       
-      // 取得したデータをセットし、表示状態をONにする
       setComments(prev => prev.map(c => c.id === commentId ? { 
         ...c, 
         replies: data, 
@@ -293,15 +286,44 @@ export default function ProjectPage() {
         
         <div className="w-full lg:w-[65%] xl:w-[70%]">
           
-          <div className="w-full aspect-[4/3] bg-gray-100 dark:bg-gray-800 rounded-xl overflow-hidden mb-4 shadow-md">
+          {/* 💡 変更部分：フルスクリーン状態に応じて見た目を切り替える */}
+          <div 
+            className={
+              isFakeFullscreen 
+                ? "fixed inset-0 z-[100] bg-black flex flex-col items-center justify-center w-full h-[100dvh]" 
+                : "w-full aspect-[4/3] bg-gray-100 dark:bg-gray-800 rounded-xl overflow-hidden mb-2 shadow-md relative"
+            }
+          >
             <iframe 
               src={iframeSrc} 
               width="100%" 
               height="100%" 
-              className="border-none"
+              className="border-none w-full h-full"
               allowFullScreen
             ></iframe>
+
+            {/* フルスクリーン解除ボタン（フルスクリーン時のみ表示、縦横対応で余裕を持たせた配置） */}
+            {isFakeFullscreen && (
+              <button 
+                onClick={() => setIsFakeFullscreen(false)}
+                className="absolute top-8 right-6 sm:top-10 sm:right-8 bg-gray-900/80 text-white px-5 py-2.5 rounded-full font-bold z-[110] hover:bg-gray-700 backdrop-blur-md shadow-lg border border-gray-600/50 flex items-center gap-2 transition-transform active:scale-95"
+              >
+                ✕ 閉じる
+              </button>
+            )}
           </div>
+
+          {/* スマホ用：独自の全画面ボタン（通常時のみ表示） */}
+          {!isFakeFullscreen && (
+            <div className="flex justify-end mb-4 sm:hidden">
+              <button 
+                onClick={() => setIsFakeFullscreen(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200 text-sm font-bold rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+              >
+                全画面
+              </button>
+            </div>
+          )}
 
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-3">{project.title}</h1>
 
@@ -463,7 +485,6 @@ export default function ProjectPage() {
                           {linkify(comment.content)}
                         </p>
 
-                        {/* 💡 返信ボタン */}
                         {comment.reply_count > 0 && (
                           <button 
                             onClick={() => toggleReplies(comment.id)}
@@ -480,7 +501,6 @@ export default function ProjectPage() {
                           </button>
                         )}
 
-                        {/* 💡 返信リストの表示 */}
                         {comment.repliesVisible && comment.replies && (
                           <div className="mt-4 flex flex-col gap-4 border-l-2 border-gray-200 dark:border-gray-700 pl-4 ml-1">
                             {comment.replies.map((reply) => (
@@ -529,7 +549,6 @@ export default function ProjectPage() {
 
         </div>
 
-        {/* --- 右側のサイドバー部分は変更なし --- */}
         <div className="w-full lg:w-[35%] xl:w-[30%] mt-8 lg:mt-0">
           <div className="flex gap-2 mb-4">
             <button 
